@@ -7,7 +7,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.2 - Стабильная) ---"
+PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.3 - Финальные базы) ---"
 
 # Определяем состояния для диалога
 TREND_INPUT = 0
@@ -16,7 +16,9 @@ TREND_INPUT = 0
 def download_dictionary(url, name):
     print(f"Загружаю словарь '{name}' из интернета...")
     try:
-        response = requests.get(url)
+        # Добавляем заголовки, чтобы имитировать браузер
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         words = response.content.decode('utf-8').splitlines()
         print(f"Успешно загружено {len(words)} слов.")
@@ -25,10 +27,10 @@ def download_dictionary(url, name):
         print(f"ОШИБКА: Не удалось загрузить словарь '{name}': {e}")
         return []
 
-# --- ОБНОВЛЕННЫЕ ССЫЛКИ НА БОЛЬШИЕ ИНТЕРНЕТ-СЛОВАРИ ---
-URL_SUBJECTS = "https://raw.githubusercontent.com/danakt/russian-words/master/nouns.txt"
-URL_ACTIONS = "https://raw.githubusercontent.com/danakt/russian-words/master/verbs.txt" # Будем использовать как действия
-URL_SCENES = "https://raw.githubusercontent.com/danakt/russian-words/master/adjectives.txt" # Будем использовать как описания сцен
+# --- ФИНАЛЬНЫЕ, ПРОВЕРЕННЫЕ ССЫЛКИ НА БОЛЬШИЕ ИНТЕРНЕТ-СЛОВАРИ ---
+URL_SUBJECTS = "https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt"
+URL_ACTIONS = "https://raw.githubusercontent.com/Harrix/Russian-Verbs/main/dist/russian_verbs.txt" # Будем использовать как действия
+URL_SCENES = "https://raw.githubusercontent.com/Harrix/Russian-Adjectives/main/dist/russian_adjectives.txt" # Будем использовать как описания сцен
 
 # --- ЗАГРУЖАЕМ СЛОВАРИ ПРИ СТАРТЕ БОТА ---
 SUBJECTS_RU = download_dictionary(URL_SUBJECTS, "Герои (существительные)")
