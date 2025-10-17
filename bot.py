@@ -7,7 +7,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.0 Интернет + Ручные тренды) ---"
+PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.1 - Новые базы) ---"
 
 # Определяем состояния для диалога
 TREND_INPUT = 0
@@ -25,10 +25,10 @@ def download_dictionary(url, name):
         print(f"ОШИБКА: Не удалось загрузить словарь '{name}': {e}")
         return []
 
-# --- ССЫЛКИ НА БОЛЬШИЕ ИНТЕРНЕТ-СЛОВАРИ ---
-URL_SUBJECTS = "https://raw.githubusercontent.com/L-Lord/ru-p-s-adjectives/master/nouns.txt"
-URL_ACTIONS = "https://raw.githubusercontent.com/L-Lord/ru-p-s-adjectives/master/verbs.txt" # Будем использовать как действия
-URL_SCENES = "https://raw.githubusercontent.com/L-Lord/ru-p-s-adjectives/master/adjectives.txt" # Будем использовать как описания сцен
+# --- ОБНОВЛЕННЫЕ ССЫЛКИ НА БОЛЬШИЕ ИНТЕРНЕТ-СЛОВАРИ ---
+URL_SUBJECTS = "https://raw.githubusercontent.com/danakt/russian-words/master/nouns.txt"
+URL_ACTIONS = "https://raw.githubusercontent.com/danakt/russian-words/master/verbs.txt" # Будем использовать как действия
+URL_SCENES = "https://raw.githubusercontent.com/danakt/russian-words/master/adjectives.txt" # Будем использовать как описания сцен
 
 # --- ЗАГРУЖАЕМ СЛОВАРИ ПРИ СТАРТЕ БОТА ---
 SUBJECTS_RU = download_dictionary(URL_SUBJECTS, "Герои (существительные)")
@@ -82,9 +82,9 @@ async def request_trends(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def generate_script_from_trends(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Принято! Подключаюсь к интернет-базам, анализирую ваши тренды, пишу сценарий...")
-
+    
     user_trends = [trend.strip() for trend in update.message.text.splitlines() if trend.strip()]
-
+    
     if not user_trends:
         await update.message.reply_text("Вы не ввели ни одного тренда. Пожалуйста, попробуйте снова, нажав на кнопку.")
         return ConversationHandler.END
@@ -105,7 +105,7 @@ async def generate_script_from_trends(update: Update, context: ContextTypes.DEFA
     style_ru = random.choice(STYLES_RU)
     temporal_ru = random.choice(TEMPORAL_ELEMENTS_RU)
     dahl_verb_ru = random.choice(GLAGOLY_DALYA_RU)
-
+    
     script_ru = (
         f"🎬 **Режиссерский сценарий**\n\n"
         f"▪️ **🔥 Ваш Тренд:** {trend_ru.capitalize()}\n\n"
@@ -119,7 +119,7 @@ async def generate_script_from_trends(update: Update, context: ContextTypes.DEFA
         f"▪️ **Temporal:** {temporal_ru}\n\n"
         f"🎤 **Голос Габриэля:** *И на фоне всего этого он умудрился **{dahl_verb_ru}**.*"
     )
-
+    
     prompt_en = (
         f"Trending now: {trend_en}. "
         f"{random.choice(SUBJECTS_EN)}, {random.choice(ACTIONS_EN)}, {random.choice(SCENES_EN)}, "
@@ -130,7 +130,7 @@ async def generate_script_from_trends(update: Update, context: ContextTypes.DEFA
 
     await update.message.reply_text(script_ru, parse_mode='Markdown')
     await update.message.reply_text(f"🤖 **Промпт для AI-генератора:**\n\n`{prompt_en}`", parse_mode='Markdown')
-
+    
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -144,7 +144,7 @@ def main() -> None:
         return
 
     application = Application.builder().token(TOKEN).build()
-
+    
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^Создать Сценарий 🎬$"), request_trends)],
         states={
@@ -155,9 +155,10 @@ def main() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
-
+    
     print(f"{PROJECT_NAME} запущен и готов к работе!")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
+
