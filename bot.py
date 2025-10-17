@@ -7,7 +7,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.1 - Новые базы) ---"
+PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.2 - Стабильная) ---"
 
 # Определяем состояния для диалога
 TREND_INPUT = 0
@@ -137,6 +137,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text('Действие отменено. Нажмите кнопку, чтобы начать снова.')
     return ConversationHandler.END
 
+# НОВЫЙ БЛОК: "Помощник режиссера" для отлова ошибок
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Записывает ошибки в лог, чтобы бот не падал."""
+    print(f"Произошла ошибка: {context.error}")
+
 def main() -> None:
     TOKEN = os.environ.get('TELEGRAM_TOKEN')
     if not TOKEN:
@@ -145,6 +150,10 @@ def main() -> None:
 
     application = Application.builder().token(TOKEN).build()
     
+    # Подключаем "помощника режиссера"
+    application.add_error_handler(error_handler)
+    
+    # Создаем обработчик диалога
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^Создать Сценарий 🎬$"), request_trends)],
         states={
