@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import random
+import requests # <--- ВОТ ОНА, ТА САМАЯ СТРОЧКА, КОТОРАЯ ВСЕ ЧИНИТ
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, CallbackQueryHandler)
 
