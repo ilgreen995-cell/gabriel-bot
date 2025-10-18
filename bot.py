@@ -241,7 +241,7 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            SELECTING_THEMES: [CallbackQueryHandler(select_theme)],
+            SELECTING_THEMES: [CallbackQueryHandler(select_theme,per_message=False)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
@@ -253,4 +253,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
