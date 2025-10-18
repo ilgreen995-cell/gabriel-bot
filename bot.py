@@ -1,23 +1,20 @@
 # -*- coding: utf-8 -*-
 import os
 import random
-import asyncio
-import requests # "Интернет-антенна" для скачивания словарей
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, CallbackQueryHandler)
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v7.3 - Финальные базы) ---"
+PROJECT_NAME = "--- AI-режиссер «Габриэль глаголит Даля» (v9.0 Бредогенератор) ---"
 
 # Определяем состояния для диалога
-TREND_INPUT = 0
+SELECTING_THEMES, GENERATING = range(2)
 
 # --- Функция для скачивания словарей из интернета ---
 def download_dictionary(url, name):
     print(f"Загружаю словарь '{name}' из интернета...")
     try:
-        # Добавляем заголовки, чтобы имитировать браузер
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         words = response.content.decode('utf-8').splitlines()
@@ -27,121 +24,202 @@ def download_dictionary(url, name):
         print(f"ОШИБКА: Не удалось загрузить словарь '{name}': {e}")
         return []
 
-# --- ФИНАЛЬНЫЕ, ПРОВЕРЕННЫЕ ССЫЛКИ НА БОЛЬШИЕ ИНТЕРНЕТ-СЛОВАРИ ---
-URL_SUBJECTS = "https://raw.githubusercontent.com/Harrix/Russian-Nouns/main/dist/russian_nouns.txt"
-URL_ACTIONS = "https://raw.githubusercontent.com/Harrix/Russian-Verbs/main/dist/russian_verbs.txt" # Будем использовать как действия
-URL_SCENES = "https://raw.githubusercontent.com/Harrix/Russian-Adjectives/main/dist/russian_adjectives.txt" # Будем использовать как описания сцен
+# --- ИНТЕРНЕТ-БАЗЫ СЛОВ ---
+URL_NOUNS = "https://raw.githubusercontent.com/danakt/russian-words/master/nouns.txt"
+URL_VERBS = "https://raw.githubusercontent.com/danakt/russian-words/master/verbs.txt"
+URL_ADJECTIVES = "https://raw.githubusercontent.com/danakt/russian-words/master/adjectives.txt"
 
-# --- ЗАГРУЖАЕМ СЛОВАРИ ПРИ СТАРТЕ БОТА ---
-SUBJECTS_RU = download_dictionary(URL_SUBJECTS, "Герои (существительные)")
-ACTIONS_RU = download_dictionary(URL_ACTIONS, "Действия (глаголы)")
-SCENES_RU_ADJECTIVES = download_dictionary(URL_SCENES, "Сцены (прилагательные)")
+NOUNS_RU = download_dictionary(URL_NOUNS, "Существительные")
+VERBS_RU = download_dictionary(URL_VERBS, "Глаголы")
+ADJECTIVES_RU = download_dictionary(URL_ADJECTIVES, "Прилагательные")
 
-# Добавим немного конкретных мест для разнообразия
-SCENES_RU_NOUNS = ["в пустой галерее", "на тихом озере", "на поверхности Марса", "в операционной будущего", "на кухне ресторана", "в ночном Токио", "в пентхаусе с видом на город", "на пиратском корабле", "в концертном зале", "в заброшенном храме", "на гоночной трассе"]
+# --- БОЛЬШАЯ БАЗА ТЕМАТИЧЕСКИХ СЛОВ (14 ТЕМ) ---
+THEMES = {
+    "искусство": {"keywords": ["art", "sculpture", "painting", "gallery"]},
+    "рыбалка": {"keywords": ["fishing", "lake", "fish", "boat"]},
+    "космос": {"keywords": ["space", "astronaut", "planet", "rocket"]},
+    "медицина": {"keywords": ["medical", "doctor", "hospital", "science"]},
+    "кулинария": {"keywords": ["cooking", "food", "kitchen", "restaurant"]},
+    "военное дело": {"keywords": ["military", "soldier", "tank", "battle"]},
+    "мифология": {"keywords": ["mythology", "gods", "legend", "monster"]},
+    "наука": {"keywords": ["science", "laboratory", "experiment", "discovery"]},
+    "пиратство": {"keywords": ["pirate", "ship", "treasure", "ocean"]},
+    "музыка": {"keywords": ["music", "concert", "symphony", "piano"]},
+    "религия": {"keywords": ["religion", "temple", "angel", "prayer"]},
+    "роскошная жизнь": {"keywords": ["luxury", "yacht", "mansion", "diamonds"]},
+    "автомобили": {"keywords": ["car", "racing", "supercar", "engine"]},
+    "интернет и тренды": {"keywords": ["internet", "viral", "meme", "hacker"]}
+}
 
-# --- ДУША ПРОЕКТА: ГЛАГОЛЫ ДАЛЯ ---
-GLAGOLY_DALYA_RU = ["встопорщиться", "ерничать", "околпачить", "лукавствовать", "негодовать", "брезжить", "кумекать", "учинить", "насупиться", "ворожить", "скоморошничать", "пенять", "лебезить", "судачить", "юродствовать", "кощунствовать", "ерепениться", "благолепствовать", "фиглярничать", "тунеядствовать", "усердствовать", "лихоимствовать"]
+# --- ДУША ПРОЕКТА: РАСШИРЕННЫЙ СЛОВАРЬ ДАЛЯ ---
+GLAGOLY_DALYA_RU = [
+    "встопорщиться", "ерничать", "околпачить", "лукавствовать", "негодовать", "брезжить", 
+    "кумекать", "учинить", "насупиться", "ворожить", "скоморошничать", "пенять", "лебезить", 
+    "судачить", "юродствовать", "кощунствовать", "ерепениться", "благолепствовать", 
+    "фиглярничать", "тунеядствовать", "усердствовать", "лихоимствовать", "благоухать", 
+    "велеречить", "возбранять", "гнушаться", "гоношиться", "дерзновенно", "е Vозбранять", 
+    "канителиться", "кашеварить", "клянчить", "колобродить", "кочевряжиться", "куражиться", 
+    "куролесить", "лоботрясничать", "лукавить", "маяться", "мешкать", "миндальничать", 
+    "мудровать", "набедокурить", "навостриться", "назойничать", "напутствовать", 
+    "насмешничать", "натореть", "недоумевать", "неистовствовать", "обмишулиться", 
+    "обособиться", "образумиться", "окаянствовать", "опростоволоситься", "осерчать", 
+    "остолбенеть", "отлынивать", "охальничать", "пакостить", "паясничать", "перечить", 
+    "пировать", "пластаться", "плутовать", "подтрунивать", "помыкать", "потворствовать", 
+    "почивать", "праздновать", "прекословить", "препираться", "привередничать", "прихвастнуть", 
+    "проказничать", "пустословить", "раболепствовать", "разглагольствовать", "разохотиться", 
+    "распекать", "своевольничать", "сквернословить", "смиренно", "сокрушаться", "суетиться", 
+    "сумасбродствовать", "тешиться", "томиться", "торжествовать", "трепетать", "трусить", 
+    "тщеславиться", "ублажать", "угождать", "умиляться", "уповать", "упрямиться", 
+    "философствовать", "фордыбачить", "ханжить", "хвастать", "хитрить", "хлопотать", 
+    "хохмить", "царствовать", "чародействовать", "чествовать", "чопорничать", "чудить", 
+    "шалопайничать", "шествовать", "шиковать", "шкодить", "шутить", "щеголять", "юлить"
+]
 
-# --- ТЕХНИЧЕСКИЕ ПАРАМЕТРЫ СЪЕМКИ (остаются неизменными) ---
+# --- ТЕХНИЧЕСКИЕ ПАРАМЕТРЫ СЪЕМКИ ---
 CAMERA_ANGLES_RU = ["Крупный план", "Сверхширокий общий план", "Съемка с нижнего ракурса", "Вид сверху (птичий полет)", "Голландский угол", "Съемка из-за плеча"]
 CAMERA_MOVEMENTS_RU = ["Плавный наезд (dolly in)", "Быстрый, резкий монтаж", "Медленное панорамирование", "Съемка со стедикама", "Вращение камеры", "Эффект 'вертиго'"]
 LENS_EFFECTS_RU = ["Эффект 'рыбий глаз'", "Мягкий фокус с боке", "Анаморфотные блики", "Эффект миниатюры 'тильт-шифт'", "Глубокая резкость", "Засветка пленки"]
 STYLES_RU = ["в стиле Уэса Андерсона", "гиперреализм", "как запись на VHS кассету 80-х", "кукольная анимация", "в стиле аниме студии Ghibli", "киберпанк", "стимпанк", "съемка на IMAX камеру", "в стиле картины барокко"]
 TEMPORAL_ELEMENTS_RU = ["Замедленная съемка (slow motion)", "Ускоренная съемка (timelapse)", "Резкий стоп-кадр", "Обратная перемотка действия", "Эффект 'bullet time'"]
+AUDIO_RU = ["Эпическая оркестровая музыка", "Звуки природы: шум дождя и пение птиц", "Тишина, прерываемая редкими шагами", "Электронная музыка в стиле 80-х", "Диалог шепотом", "Звук работающего двигателя", "Смех толпы"]
 
-# --- АНГЛИЙСКИЕ ВЕРСИИ ДЛЯ ПРОМПТА (остаются для структуры) ---
-SUBJECTS_EN = ["a living statue", "a talking fish", "a lonely astronaut"]
-ACTIONS_EN = ["writing a self-portrait", "smoking a cigar", "playing golf on the Moon"]
-SCENES_EN = ["in an empty art gallery", "on a quiet lake", "on the surface of Mars"]
-CAMERA_ANGLES_EN = ["close-up shot", "extreme wide shot", "low-angle shot"]
-CAMERA_MOVEMENTS_EN = ["dolly in", "fast cut editing", "slow panning"]
-LENS_EFFECTS_EN = ["fisheye lens", "soft focus with bokeh", "anamorphic lens flare"]
-STYLES_EN = ["in the style of Wes Anderson", "hyperrealistic", "80s VHS recording"]
-TEMPORAL_ELEMENTS_EN = ["slow motion", "timelapse", "freeze frame"]
+# --- Английские версии для промпта ---
+CAMERA_ANGLES_EN = ["close-up shot", "extreme wide shot", "low-angle shot", "top-down shot", "dutch angle", "over-the-shoulder shot"]
+CAMERA_MOVEMENTS_EN = ["dolly in", "fast cut editing", "slow panning", "steadicam shot", "360-degree rotation", "vertigo effect"]
+LENS_EFFECTS_EN = ["fisheye lens", "soft focus with bokeh", "anamorphic lens flare", "tilt-shift effect", "deep focus", "light leak"]
+STYLES_EN = ["in the style of Wes Anderson", "hyperrealistic, 8K", "80s VHS recording", "stop-motion animation", "Studio Ghibli anime style", "cyberpunk, neon-lit", "steampunk", "shot on IMAX film", "baroque painting"]
+TEMPORAL_ELEMENTS_EN = ["slow motion", "timelapse", "freeze frame", "reverse motion", "bullet time effect"]
+AUDIO_EN = ["epic orchestral music", "sounds of nature, rain and birds", "silence broken by footsteps", "80s electronic synth music", "whispered dialogue", "engine running sounds", "crowd laughing"]
 
 
 # --- ИНТЕРАКТИВНЫЕ ФУНКЦИИ БОТА ---
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    keyboard = [["Создать Сценарий 🎬"]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-    user = update.effective_user
-    await update.message.reply_html(
-        f"Привет, {user.mention_html()}! Я — AI-режиссер Габриэль.\n\n"
-        "Я создаю вирусные сценарии на основе твоих трендов и безграничных баз слов.\n\n"
-        "Нажми на кнопку, чтобы начать.",
-        reply_markup=reply_markup,
-    )
-    return ConversationHandler.END
+def get_theme_keyboard(selected_themes):
+    keyboard = []
+    row = []
+    for theme_name in THEMES:
+        text = f"✅ {theme_name.capitalize()}" if theme_name in selected_themes else theme_name.capitalize()
+        row.append(InlineKeyboardButton(text, callback_data=theme_name))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    if len(selected_themes) == 3:
+        keyboard.append([InlineKeyboardButton("🚀 Создать Сценарий!", callback_data="generate")])
+        
+    return InlineKeyboardMarkup(keyboard)
 
-async def request_trends(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['selected_themes'] = []
+    keyboard = get_theme_keyboard([])
     await update.message.reply_text(
-        "Отлично! Теперь введите до 3-х актуальных трендов, каждый с новой строки.\n\n"
-        "Я выберу один случайным образом и построю вокруг него сценарий."
+        "Привет! Я — AI-режиссер Габриэль.\n\n"
+        "Пожалуйста, выбери три темы для создания уникального сценария.",
+        reply_markup=keyboard
     )
-    return TREND_INPUT
+    return SELECTING_THEMES
 
-async def generate_script_from_trends(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Принято! Подключаюсь к интернет-базам, анализирую ваши тренды, пишу сценарий...")
+async def select_theme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    theme_name = query.data
     
-    user_trends = [trend.strip() for trend in update.message.text.splitlines() if trend.strip()]
+    selected_themes = context.user_data.get('selected_themes', [])
+
+    if theme_name == "generate":
+        return await generate_script(update, context)
+
+    if theme_name in selected_themes:
+        selected_themes.remove(theme_name)
+    elif len(selected_themes) < 3:
+        selected_themes.append(theme_name)
+        
+    context.user_data['selected_themes'] = selected_themes
     
-    if not user_trends:
-        await update.message.reply_text("Вы не ввели ни одного тренда. Пожалуйста, попробуйте снова, нажав на кнопку.")
-        return ConversationHandler.END
+    keyboard = get_theme_keyboard(selected_themes)
+    
+    count = len(selected_themes)
+    if count == 0:
+        text = "Выбери три темы для создания уникального сценария."
+    elif count == 1:
+        text = f"Выбрано: {selected_themes[0].capitalize()}. Осталось две."
+    elif count == 2:
+        text = f"Выбрано: {selected_themes[0].capitalize()}, {selected_themes[1].capitalize()}. Осталась одна."
+    else: # count == 3
+        text = f"Отлично! Твой микс: {selected_themes[0].capitalize()}, {selected_themes[1].capitalize()}, {selected_themes[2].capitalize()}.\n\nНажми 'Создать Сценарий!'."
 
-    if not all([SUBJECTS_RU, ACTIONS_RU, SCENES_RU_ADJECTIVES]):
-         await update.message.reply_text("Извините, не удалось загрузить словари из интернета. Попробуйте позже.")
-         return ConversationHandler.END
+    await query.edit_message_text(text=text, reply_markup=keyboard)
+    
+    return SELECTING_THEMES
 
-    trend_ru = random.choice(user_trends)
-    trend_en = "something trending now"
 
-    subject_ru = random.choice(SUBJECTS_RU)
-    action_ru = random.choice(ACTIONS_RU)
-    scene_ru = f"{random.choice(SCENES_RU_ADJECTIVES)} {random.choice(SCENES_RU_NOUNS)}"
+async def generate_script(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.edit_message_text(text="Принято! Создаю профессиональный сценарий для VEO, ищу душу в словаре Даля...")
+
+    selected_themes = context.user_data.get('selected_themes', [])
+
+    # Генерация технической части сценария
+    subject_ru = random.choice(NOUNS_RU)
+    action_ru = random.choice(VERBS_RU)
+    scene_ru = f"{random.choice(ADJECTIVES_RU)} пейзаж"
     angle_ru = random.choice(CAMERA_ANGLES_RU)
     movement_ru = random.choice(CAMERA_MOVEMENTS_RU)
     lens_ru = random.choice(LENS_EFFECTS_RU)
     style_ru = random.choice(STYLES_RU)
     temporal_ru = random.choice(TEMPORAL_ELEMENTS_RU)
-    dahl_verb_ru = random.choice(GLAGOLY_DALYA_RU)
+    audio_ru = random.choice(AUDIO_RU)
+    dahl_verb_ru = random.choice(GLAGOLY_DALYA_RU) # Выбираем душу проекта
     
     script_ru = (
-        f"🎬 **Режиссерский сценарий**\n\n"
-        f"▪️ **🔥 Ваш Тренд:** {trend_ru.capitalize()}\n\n"
+        f"🎬 **Режиссерский сценарий (VEO)**\n\n"
         f"▪️ **Subject:** {subject_ru.capitalize()}\n"
         f"▪️ **Action:** {action_ru}\n"
         f"▪️ **Scene:** {scene_ru}\n"
-        f"▪️ **Camera Angle:** {angle_ru}\n"
-        f"▪️ **Camera Movement:** {movement_ru}\n"
-        f"▪️ **Lens Effect:** {lens_ru}\n"
+        f"▪️ **Camera angles:** {angle_ru}\n"
+        f"▪️ **Camera movements:** {movement_ru}\n"
+        f"▪️ **Lens effects:** {lens_ru}\n"
         f"▪️ **Style:** {style_ru}\n"
-        f"▪️ **Temporal:** {temporal_ru}\n\n"
-        f"🎤 **Голос Габриэля:** *И на фоне всего этого он умудрился **{dahl_verb_ru}**.*"
+        f"▪️ **Temporal elements:** {temporal_ru}\n"
+        f"▪️ **Audio:** {audio_ru}\n\n"
+        f"🎤 **Голос Габриэля:** *И при всем при этом он умудрился **{dahl_verb_ru}**.*"
     )
+
+    # Генерация промпта для AI
+    keywords_en = [kw for theme in selected_themes for kw in THEMES[theme]["keywords"]]
+    
+    # Переводим случайные русские слова для английского промпта (имитация)
+    subject_en = "a " + subject_ru 
+    action_en = action_ru
+    scene_en = "a " + scene_ru
     
     prompt_en = (
-        f"Trending now: {trend_en}. "
-        f"{random.choice(SUBJECTS_EN)}, {random.choice(ACTIONS_EN)}, {random.choice(SCENES_EN)}, "
-        f"{random.choice(CAMERA_ANGLES_EN)}, {random.choice(CAMERA_MOVEMENTS_EN)}, {random.choice(LENS_EFFECTS_EN)}, "
-        f"{random.choice(STYLES_EN)}, {random.choice(TEMPORAL_ELEMENTS_EN)}, "
-        f"cinematic, masterpiece, high detail"
+        f"Subject: {subject_en}, {' '.join(keywords_en)}\n"
+        f"Action: {action_en}\n"
+        f"Scene: {scene_en}\n"
+        f"Camera angles: {random.choice(CAMERA_ANGLES_EN)}\n"
+        f"Camera movements: {random.choice(CAMERA_MOVEMENTS_EN)}\n"
+        f"Lens effects: {random.choice(LENS_EFFECTS_EN)}\n"
+        f"Style: {random.choice(STYLES_EN)}\n"
+        f"Temporal elements: {random.choice(TEMPORAL_ELEMENTS_EN)}\n"
+        f"Audio: {random.choice(AUDIO_EN)}"
     )
 
-    await update.message.reply_text(script_ru, parse_mode='Markdown')
-    await update.message.reply_text(f"🤖 **Промпт для AI-генератора:**\n\n`{prompt_en}`", parse_mode='Markdown')
+    await context.bot.send_message(chat_id=query.message.chat_id, text=script_ru, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=query.message.chat_id, text=f"🤖 **Промпт для VEO:**\n\n`{prompt_en}`", parse_mode='Markdown')
     
+    context.user_data.clear()
     return ConversationHandler.END
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text('Действие отменено. Нажмите кнопку, чтобы начать снова.')
+    await update.message.reply_text('Действие отменено. Напишите /start, чтобы начать снова.')
+    context.user_data.clear()
     return ConversationHandler.END
 
-# НОВЫЙ БЛОК: "Помощник режиссера" для отлова ошибок
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Записывает ошибки в лог, чтобы бот не падал."""
     print(f"Произошла ошибка: {context.error}")
 
 def main() -> None:
@@ -152,19 +230,16 @@ def main() -> None:
 
     application = Application.builder().token(TOKEN).build()
     
-    # Подключаем "помощника режиссера"
     application.add_error_handler(error_handler)
     
-    # Создаем обработчик диалога
     conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^Создать Сценарий 🎬$"), request_trends)],
+        entry_points=[CommandHandler('start', start)],
         states={
-            TREND_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, generate_script_from_trends)],
+            SELECTING_THEMES: [CallbackQueryHandler(select_theme)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
 
-    application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
     
     print(f"{PROJECT_NAME} запущен и готов к работе!")
