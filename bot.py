@@ -6,9 +6,9 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- Контент-завод «Габриэль глаголит Даля» (v2.1 Стабильная) ---"
+PROJECT_NAME = "--- Контент-завод «Габриэль глаголит Даля» (v3.0 Финальная) ---"
 
-# --- БАЗА ДАННЫХ СЛОВ (v1.0 - Встроена в код) ---
+# --- БАЗА ДАННЫХ СЛОВ ---
 CATEGORIES = {
     "Еда": {
         "adjectives": ["Карамельный", "Подгоревший", "Ледяной", "Острый", "Сливочный"],
@@ -32,33 +32,32 @@ CATEGORIES = {
     }
 }
 
-# --- ДУША ПРОЕКТА: ГЛАГОЛЫ ДАЛЯ (В ПРАВИЛЬНОЙ ФОРМЕ) ---
+# --- ДУША ПРОЕКТА: ГЛАГОЛЫ ДАЛЯ ---
 DAHL_VERBS = ["юлит", "шарахает", "голдит", "еры́згает", "кумекает", "ерепенится", "фиглярничает", "скоморошничает", "лукавствует", "пеняет"]
 
-# --- НОВЫЙ БЛОК: ИНТЕГРАЦИЯ С GEMINI ---
+# --- ИНТЕГРАЦИЯ С GEMINI ---
 
 async def modernize_with_gemini(prompts: list) -> str:
     """Отправляет промпты в Gemini и получает один обогащенный сценарий."""
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        # ИСПОЛЬЗУЕМ НОВУЮ, СТАБИЛЬНУЮ МОДЕЛЬ
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
-        # Наша инструкция для Gemini
         meta_prompt = (
             "Ты — гениальный креативный директор для вирусных видео. "
-            "Тебе даны 3 абсурдные идеи, сгенерированные бредогенератором. "
-            "Твоя задача: объединить эти идеи в один детализированный, визуально насыщенный и кинематографичный сценарий для видео-нейросети. "
+            "Тебе даны 3 абсурдные идеи. "
+            "Твоя задача: объединить их в один детализированный, визуально насыщенный и кинематографичный сценарий для видео-нейросети. "
             "Опиши сцену, действия, стиль и атмосферу. Сделай это странным, но понятным для визуализации.\n\n"
-            "Вот идеи:\n"
-            f"1. {prompts[0]}\n"
-            f"2. {prompts[1]}\n"
-            f"3. {prompts[2]}\n\n"
+            "Идеи:\n"
+            f"- {prompts[0]}\n"
+            f"- {prompts[1]}\n"
+            f"- {prompts[2]}\n\n"
             "Твой сценарий:"
         )
         
         response = await model.generate_content_async(meta_prompt)
         return response.text
     except Exception as e:
-        # Улучшаем логирование, чтобы понять причину ошибки
         print(f"!!! КРИТИЧЕСКАЯ ОШИБКА при работе с Gemini: {e}")
         return "Не удалось связаться с креативным директором Gemini. Проверьте API-ключ и логи на сервере."
 
@@ -68,7 +67,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [["Габриэль, глаголь!"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text(
-        "Мы родились, чтоб разум сделать пылью. (v2.1)\n\n" # Добавили версию
+        "Мы родились, чтоб разум сделать пылью. (v3.0)\n\n"
         "Нажми на кнопку.",
         reply_markup=reply_markup,
     )
@@ -76,7 +75,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Принято! Генерирую абсурд, отправляю на креативный совет к Gemini...")
 
-    # 1. Генерация 3-х базовых промтов
     category_names = list(CATEGORIES.keys())
     selected_categories = random.sample(category_names, 3)
     adjective_pool = [adj for cat in selected_categories for adj in CATEGORIES[cat]["adjectives"]]
@@ -89,10 +87,8 @@ async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         verb = random.choice(DAHL_VERBS)
         base_prompts.append(f"{adj} {noun} {verb}")
 
-    # 2. Модернизация промтов с помощью Gemini
     gemini_script = await modernize_with_gemini(base_prompts)
 
-    # 3. Отправка результата
     theme_text = ", ".join(selected_categories)
     final_message = (
         f"🔥 **Креативный совет завершен!**\n\n"
@@ -110,17 +106,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     print(f"Произошла ошибка: {context.error}")
 
 def main() -> None:
-    # --- НАСТРОЙКА API ---
     TOKEN = os.environ.get('TELEGRAM_TOKEN')
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
     if not TOKEN or not GEMINI_API_KEY:
-        print("ОШИБКА: Один из API-ключей (TELEGRAM_TOKEN или GEMINI_API_KEY) не найден.")
+        print("ОШИБКА: Один из API-ключей не найден.")
         return
         
     genai.configure(api_key=GEMINI_API_KEY)
 
-    # --- ЗАПУСК БОТА ---
     application = Application.builder().token(TOKEN).build()
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler("start", start))
