@@ -6,7 +6,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- НАЗВАНИЕ ПРОЕКТА ---
-PROJECT_NAME = "--- Контент-завод «Габриэль глаголит Даля» (v2.0 с Gemini) ---"
+PROJECT_NAME = "--- Контент-завод «Габриэль глаголит Даля» (v2.1 Стабильная) ---"
 
 # --- БАЗА ДАННЫХ СЛОВ (v1.0 - Встроена в код) ---
 CATEGORIES = {
@@ -58,8 +58,9 @@ async def modernize_with_gemini(prompts: list) -> str:
         response = await model.generate_content_async(meta_prompt)
         return response.text
     except Exception as e:
-        print(f"ОШИБКА при работе с Gemini: {e}")
-        return "Не удалось связаться с креативным директором Gemini. Попробуйте позже."
+        # Улучшаем логирование, чтобы понять причину ошибки
+        print(f"!!! КРИТИЧЕСКАЯ ОШИБКА при работе с Gemini: {e}")
+        return "Не удалось связаться с креативным директором Gemini. Проверьте API-ключ и логи на сервере."
 
 # --- ОСНОВНЫЕ ФУНКЦИИ БОТА ---
 
@@ -67,7 +68,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [["Габриэль, глаголь!"]]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text(
-        "Мы родились, чтоб разум сделать пылью.\n\n"
+        "Мы родились, чтоб разум сделать пылью. (v2.1)\n\n" # Добавили версию
         "Нажми на кнопку.",
         reply_markup=reply_markup,
     )
